@@ -1,0 +1,346 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/x-ui/access.log",
+    "error": "/var/log/x-ui/error.log"
+  },
+  "api": {
+    "port": 2053,
+    "username": "admin",
+    "password": "admin"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": 8443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "discord.com:443",
+          "xver": 0,
+          "serverNames": [
+            "discord.com",
+            "cdn.discordapp.com",
+            "media.discordapp.net"
+          ],
+          "privateKey": "",
+          "minClient": "",
+          "maxClient": "",
+          "maxTimediff": 0,
+          "shortIds": ["", "6ba85179e30d4fc2", "c0ffeec0ffee"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      },
+      "tag": "vless-reality"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 8080,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [],
+        "fallbacks": []
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "speedtest.net",
+          "certificates": []
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      },
+      "tag": "trojan-tls"
+    },
+    {
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      },
+      "tag": "socks-internal"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP"
+      }
+    },
+    {
+      "tag": "direct-game",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpFastOpen": true,
+          "tcpNoDelay": true,
+          "mark": 255
+        }
+      }
+    },
+    {
+      "tag": "russia-proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "RU_SERVER_IP",
+            "port": 8443,
+            "users": [
+              {
+                "id": "USER_UUID",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ya.ru",
+          "fingerprint": "chrome",
+          "publicKey": "RU_PUBLIC_KEY",
+          "shortId": "6ba85179e30d4fc2",
+          "spiderX": "/"
+        }
+      }
+    },
+    {
+      "tag": "europe-proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "EU_SERVER_IP",
+            "port": 8443,
+            "users": [
+              {
+                "id": "USER_UUID",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "google.com",
+          "fingerprint": "chrome",
+          "publicKey": "EU_PUBLIC_KEY",
+          "shortId": "6ba85179e30d4fc2",
+          "spiderX": "/"
+        }
+      }
+    },
+    {
+      "tag": "zapret-bypass",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "mark": 255,
+          "tcpFastOpen": true,
+          "tcpWindowClamp": 512
+        }
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole",
+      "settings": {
+        "response": {
+          "type": "http"
+        }
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "domainMatcher": "mph",
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "block",
+        "domain": [
+          "geosite:category-ads-all",
+          "geosite:category-gamble",
+          "geosite:malware"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "domain": [
+          "geosite:ru",
+          "geosite:category-gov-ru",
+          "domain:yandex.ru",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:ok.ru",
+          "domain:vk.com",
+          "domain:vk.ru",
+          "domain:sberbank.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.ru",
+          "domain:1c.ru",
+          "domain:sbp.ru",
+          "domain:mirpay.ru",
+          "domain:tinkoff.ru",
+          "domain:alfabank.ru",
+          "domain:vtb.ru",
+          "domain:mts.ru",
+          "domain:beeline.ru",
+          "domain:megafon.ru",
+          "domain:tele2.ru",
+          "domain:kinopoisk.ru",
+          "domain:ivi.ru",
+          "domain:okko.tv",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:avito.ru",
+          "domain:cian.ru",
+          "domain:hh.ru",
+          "domain:2gis.ru",
+          "domain:dns-shop.ru",
+          "domain:citilink.ru",
+          "domain:mvideo.ru",
+          "domain:eldorado.ru"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct-game",
+        "ip": [
+          "geoip:ru",
+          "geoip:private",
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct-game",
+        "port": "25565,25575,27015-27050,7000-7500,2099,5222,8088,8393-8400,9000-9999",
+        "network": "tcp,udp"
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct-game",
+        "protocol": ["bittorrent"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "zapret-bypass",
+        "domain": [
+          "geosite:telegram",
+          "geosite:discord",
+          "domain:googlevideo.com",
+          "domain:video.google.com",
+          "domain:yt3.ggpht.com",
+          "domain:youtube.com",
+          "domain:youtu.be",
+          "domain:ytimg.com",
+          "domain:chat.openai.com",
+          "domain:api.openai.com",
+          "domain:chatgpt.com"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "russia-proxy",
+        "domain": [
+          "domain:*.gov.ru",
+          "domain:*.mil.ru",
+          "domain:*.rkn.gov.ru",
+          "domain:*.customs.ru",
+          "domain:*.fns.ru",
+          "domain:*.rosreestr.ru",
+          "domain:*.gibdd.ru",
+          "domain:*.pfr.gov.ru"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "europe-proxy",
+        "domain": [
+          "geosite:google",
+          "geosite:youtube",
+          "geosite:github",
+          "geosite:twitter",
+          "geosite:instagram",
+          "geosite:facebook",
+          "geosite:openai",
+          "geosite:netflix",
+          "geosite:spotify",
+          "geosite:twitch",
+          "geosite:reddit",
+          "geosite:stackoverflow",
+          "geosite:docker",
+          "geosite:cloudflare",
+          "geosite:amazon",
+          "geosite:microsoft",
+          "geosite:apple"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "ip": [
+          "geoip:ru",
+          "geoip:private"
+        ]
+      },
+      {
+        "type": "field",
+        "outboundTag": "europe-proxy",
+        "network": "tcp,udp"
+      }
+    ]
+  },
+  "stats": {},
+  "policy": {
+    "levels": {
+      "0": {
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    },
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true,
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  },
+  "transport": {},
+  "reverse": {}
+}

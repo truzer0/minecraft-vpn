@@ -1,0 +1,17 @@
+{
+  "enablecrops": true,
+  "enablefood": true,
+  "enabletrees": true,
+  "enablemarket": true,
+  "enablefishing": true,
+  "enablebees": true,
+  "crop_drop_rate": 1.0,
+  "tree_fruit_drop_rate": 1.0,
+  "market_currency": "emerald",
+  "enable_seed_drops": true,
+  "enable_salt_generation": true,
+  "salt_vein_size": 6,
+  "salt_spawn_chance": 20,
+  "enable_crop_world_gen": true,
+  "garden_spawn_rate": 0.2
+}

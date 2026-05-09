@@ -1,0 +1,15 @@
+# Стратегия для телеграм и дискорд
+TPROXY
+MODE=tpws
+TPWS_PORTS=443,8443,5222,5223,5228,5229,5230
+TPWS_PORTS_TCP=443,8443,5222,5223,5228,5229,5230
+NFQWS_PORTS_TCP=443,8443,5222,5223,5228,5229,5230
+NFQWS_PORTS_UDP=443,8443
+
+MODE=nfqws
+NFQWS_OPT="--dpi-desync=fake --dpi-desync-ttl=8 --dpi-desync-fooling=md5sig --dpi-desync-any-protocol"
+
+# Стратегия для YouTube
+MODE=tpws
+TPWS_PORTS=443
+TPWS_OPT="--hostspell=HOST --split-pos=1"

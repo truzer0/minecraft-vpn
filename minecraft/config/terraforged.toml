@@ -1,0 +1,45 @@
+# TerraForged Configuration
+[general]
+	# Enable custom world generation
+	enabled = true
+	
+	# World generation preset
+	preset = "default"
+	
+	# Terrain scale
+	terrain_scale = 1.0
+	
+	# River frequency
+	river_frequency = 0.05
+	
+	# Lake frequency
+	lake_frequency = 0.02
+	
+	# Biome size
+	biome_size = 4
+
+[terrain]
+	# Mountain height multiplier
+	mountain_height = 1.2
+	
+	# Plains flatness
+	plains_flatness = 0.8
+	
+	# Erosion factor
+	erosion = 0.5
+	
+	# Ridge detection
+	ridges = true
+
+[features]
+	# Generate volcanos
+	volcanos = true
+	
+	# Generate hot springs
+	hot_springs = true
+	
+	# Generate eroded terrain
+	eroded_terrain = true
+	
+	# Custom trees placement
+	custom_trees = true

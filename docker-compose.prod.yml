@@ -1,0 +1,195 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # БАЗА ДАННЫХ
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus-postgres
+    environment:
+      POSTGRES_DB: nexus
+      POSTGRES_USER: nexus_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_user -d nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus-app
+    environment:
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=1024
+      - APP_URL=${APP_URL}
+      - DATABASE_URL=postgresql://nexus_user:${POSTGRES_PASSWORD}@postgres:5432/nexus
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: nexus-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - app
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - nexus-network
+    restart: always
+
+  minecraft:
+    image: itzg/minecraft-server:java17-alpine
+    container_name: nexus-minecraft
+    ports:
+      - "25565:25565/tcp"
+      - "25575:25575/tcp"
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.4"
+      TYPE: "FORGE"
+      MEMORY: "3G"
+      ONLINE_MODE: "true"
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: ${RCON_PASSWORD}
+      MAX_PLAYERS: 30
+      VIEW_DISTANCE: 8
+      ENABLE_WHITELIST: "true"
+    volumes:
+      - ./minecraft_data:/data
+      - ./minecraft/mods:/data/mods:ro
+      - ./minecraft/config:/data/config:ro
+      - ./minecraft/plugins/EasyAuth:/data/plugins/EasyAuth
+    networks:
+      - nexus-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  # ============================================
+  # 3X-UI ПАНЕЛЬ (VPN + Управление)
+  # ============================================
+  3x-ui:
+    image: ghcr.io/mhsanaei/3x-ui:latest
+    container_name: nexus-3x-ui
+    # Используем host сеть для прямого доступа к портам
+    # Это важно для Reality и XTLS
+    network_mode: host
+    environment:
+      XUI_PORT: ${XUI_PORT:-2053}           # Порт панели управления
+      XUI_USERNAME: ${XUI_USERNAME:-admin}
+      XUI_PASSWORD: ${XUI_PASSWORD:-admin}
+      TZ: "Europe/Moscow"
+    volumes:
+      - ./3x-ui/db/:/etc/x-ui/
+      - ./3x-ui/cert/:/root/cert/
+      - ./3x-ui/config:/usr/local/x-ui/bin/config.json:ro
+      - ./3x-ui/custom-routing:/etc/x-ui/custom:ro
+      # Пробрасываем docker socket для управления
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_congestion_control=bbr
+      - net.ipv4.tcp_fastopen=3
+      - net.ipv4.tcp_mtu_probing=1
+      - net.ipv4.tcp_timestamps=0
+      - net.ipv4.tcp_sack=1
+      - net.ipv4.tcp_window_scaling=1
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # ============================================
+  # ZAPRET ДЛЯ ОБХОДА DPI
+  # ============================================
+  zapret:
+    build:
+      context: ./zapret
+      dockerfile: Dockerfile
+    container_name: nexus-zapret
+    network_mode: "host"
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./zapret/config:/opt/zapret/config:ro
+      - ./zapret/logs:/opt/zapret/logs
+    environment:
+      - ZAPRET_MODE=tpws
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+
+networks:
+  nexus-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

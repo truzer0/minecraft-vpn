@@ -1,0 +1,16 @@
+[general]
+	# Show tool stats in tooltip
+	show_tool_stats = true
+	
+	# Show material info
+	show_material_info = true
+	
+	# Enable fancy rendering
+	fancy_rendering = true
+
+[gui]
+	# Show all materials in table
+	show_all_materials = true
+	
+	# Tool forge animation
+	tool_forge_animation = true

@@ -1,0 +1,105 @@
+# EasyAuth конфигурация для интеграции с вашим сайтом
+config-version: 3
+
+# Настройки базы данных
+storage:
+  type: mysql
+  mysql:
+    host: postgres  # Используем PostgreSQL
+    port: 5432
+    database: nexus
+    username: nexus_user
+    password: ${POSTGRES_PASSWORD}
+    table-prefix: 'easyauth_'
+    use-ssl: false
+    pool:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      maximum-lifetime: 1800000
+      keepalive-time: 0
+      connection-timeout: 5000
+
+# Настройки авторизации
+auth:
+  # Время на авторизацию (в секундах)
+  login-timeout: 60
+  
+  # Минимальная длина пароля
+  min-password-length: 8
+  
+  # Максимальное количество попыток входа
+  max-login-attempts: 5
+  
+  # Время блокировки после превышения попыток (в минутах)
+  block-time: 15
+  
+  # Требовать подтверждение email
+  require-email-confirmation: false
+  
+  # Разрешить авторизацию через Google (с вашего сайта)
+  google-oauth:
+    enabled: true
+    client-id: "${GOOGLE_CLIENT_ID}"
+    client-secret: "${GOOGLE_CLIENT_SECRET}"
+    redirect-uri: "https://${APP_URL}/api/minecraft/auth/callback"
+  
+  # Авто-регистрация при первом входе
+  auto-register: true
+  
+  # Синхронизация с сайтом
+  website-sync:
+    enabled: true
+    api-url: "https://${APP_URL}/api/minecraft/sync"
+    api-key: "${MC_API_KEY}"
+    sync-interval: 300  # синхронизация каждые 5 минут
+
+# Настройки сессий
+session:
+  # Время жизни сессии (в минутах)
+  session-timeout: 480  # 8 часов
+  
+  # Максимальное количество сессий с одного IP
+  max-sessions-per-ip: 3
+  
+  # Защита от угона сессии
+  ip-protection: true
+
+# Премиум настройки
+premium:
+  # Разрешить вход с лицензионных аккаунтов
+  allow-premium: true
+  
+  # Авто-регистрация премиум игроков
+  auto-register-premium: false
+
+# Настройки безопасности
+security:
+  # Защита от брутфорса
+  brute-force:
+    enabled: true
+    max-attempts: 10
+    block-time: 30  # минуты
+  
+  # Гео-блокировка
+  geo-block:
+    enabled: false
+    allowed-countries: []
+    blocked-countries: []
+
+# Команды для неавторизованных игроков
+unauthorized-commands:
+  enabled: false
+  commands:
+    - register
+    - login
+    - help
+
+# Сообщения
+messages:
+  prefix: "&8[&6Nexus&8] &7"
+  not-authenticated: "&cВы не авторизованы! Используйте /login или /register"
+  login-success: "&aУспешная авторизация!"
+  register-success: "&aУспешная регистрация! Добро пожаловать на сервер Nexus!"
+  already-authenticated: "&cВы уже авторизованы!"
+  wrong-password: "&cНеверный пароль!"
+  account-blocked: "&cВаш аккаунт временно заблокирован! Попробуйте через {time} минут."

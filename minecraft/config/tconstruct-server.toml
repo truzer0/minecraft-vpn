@@ -1,0 +1,22 @@
+[general]
+	# Enable all tool types
+	enable_all_tools = true
+	
+	# Material generation
+	generate_copper = true
+	generate_tin = true
+	generate_aluminum = true
+	
+	# Tool leveling
+	tool_leveling = true
+	tool_leveling_max = 10
+
+[balance]
+	# Tool durability multiplier
+	durability_multiplier = 1.0
+	
+	# Mining speed multiplier
+	mining_speed_multiplier = 1.0
+	
+	# Attack damage multiplier
+	attack_damage_multiplier = 1.0
