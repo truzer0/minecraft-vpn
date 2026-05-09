@@ -1,0 +1,200 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mcvpn-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-minecraft_vpn}
+      POSTGRES_USER: ${POSTGRES_USER:-minecraft_vpn_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
+    networks:
+      - mcvpn-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minecraft_vpn_user} -d ${POSTGRES_DB:-minecraft_vpn}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcvpn-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - mcvpn-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcvpn-app
+    environment:
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=1024
+      - APP_URL=${APP_URL:-https://minecraft-vpn.com}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-minecraft_vpn_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-minecraft_vpn}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - MC_RCON_HOST=minecraft
+      - MC_RCON_PORT=25575
+      - MC_RCON_PASSWORD=${RCON_PASSWORD}
+      - MC_API_KEY=${MC_API_KEY}
+      - XUI_PORT=${XUI_PORT:-2053}
+      - XUI_USERNAME=${XUI_USERNAME:-admin}
+      - XUI_PASSWORD=${XUI_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mcvpn-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1.2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: mcvpn-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - app
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - mcvpn-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+
+  minecraft:
+    image: itzg/minecraft-server:java17-alpine
+    container_name: mcvpn-minecraft
+    ports:
+      - "25565:25565/tcp"
+      - "25575:25575/tcp"
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.4"
+      TYPE: "FORGE"
+      FORGE_VERSION: "49.1.0"
+      MEMORY: "3G"
+      JVM_XX_OPTS: "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200"
+      ONLINE_MODE: "true"
+      SERVER_PORT: 25565
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: ${RCON_PASSWORD}
+      RCON_PORT: 25575
+      MAX_PLAYERS: 30
+      VIEW_DISTANCE: 8
+      SIMULATION_DISTANCE: 6
+      ENABLE_WHITELIST: "true"
+      ENFORCE_WHITELIST: "true"
+      USE_AIKAR_FLAGS: "true"
+    volumes:
+      - ./minecraft_data:/data
+      - ./minecraft/mods:/data/mods:ro
+      - ./minecraft/config:/data/config:ro
+      - ./minecraft/plugins/EasyAuth:/data/plugins/EasyAuth
+    networks:
+      - mcvpn-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  3x-ui:
+    image: ghcr.io/mhsanaei/3x-ui:latest
+    container_name: mcvpn-3x-ui
+    network_mode: host
+    environment:
+      XUI_PORT: ${XUI_PORT:-2053}
+      XUI_USERNAME: ${XUI_USERNAME:-admin}
+      XUI_PASSWORD: ${XUI_PASSWORD}
+      TZ: "Europe/Moscow"
+    volumes:
+      - ./3x-ui/db/:/etc/x-ui/
+      - ./3x-ui/cert/:/root/cert/
+      - ./3x-ui/config/config.json:/usr/local/x-ui/bin/config.json:ro
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_congestion_control=bbr
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 512M
+
+  zapret:
+    build:
+      context: ./zapret
+      dockerfile: Dockerfile
+    container_name: mcvpn-zapret
+    network_mode: "host"
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./zapret/config:/opt/zapret/config:ro
+      - ./zapret/logs:/opt/zapret/logs
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+
+networks:
+  mcvpn-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
