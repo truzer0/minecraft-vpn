@@ -59,4 +59,4 @@
 
 ```bash
 # Одна команда для установки
-curl -sSL https://raw.githubusercontent.com/your-username/minecraft-vpn/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/truzer0/minecraft-vpn/main/install.sh
