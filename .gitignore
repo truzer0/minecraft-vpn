@@ -1,0 +1,74 @@
+# Бинарники и большие файлы
+*.jar
+*.zip
+*.tar.gz
+*.db
+*.sqlite3
+*.sqlite
+*.key
+*.crt
+*.pem
+*.log
+*.gz
+
+# Docker
+docker-compose.yml.save*
+*.dockerignore
+
+# Логи
+logs/
+nginx-logs/
+*-logs/
+*.log
+
+# Данные приложений
+minecraft_data/
+minecraft2_data/
+3x-ui/db/
+backups/
+
+# Временные файлы
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+node_modules/
+dist/
+dist-worker/
+.cache/
+
+# Секреты
+.env
+public.key
+private.key
+ssl/
+*.crt
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Zapret (бинарник)
+zapret/
+install-zapret-direct.sh
+
+# Xray
+xray/
+
+# Другое
+happ
+INSTALLATION_INFO.txt
+INSTALL.md
