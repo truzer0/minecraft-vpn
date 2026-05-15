@@ -1,0 +1,57 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'fail2ban'
+    static_configs:
+      - targets: ['fail2ban-exporter:9191']
+    metrics_path: '/metrics'
+
+  - job_name: 'fail2ban_geo'
+    static_configs:
+      - targets: ['fail2ban-geo-exporter:9192']
+
+  - job_name: 'minecraft'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['mcvpn-minecraft2:9940']
+        labels:
+          server: 'Youer Server'
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['172.17.0.1:9100']
+        labels:
+          host: 'minecraft-proxy'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          host: 'minecraft-proxy'
+
+
+  - job_name: 'postgres_exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'x_ui_exporter'
+    static_configs:
+      - targets: ['x-ui-exporter:9090']
+    metrics_path: '/metrics'
+
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://minecraft-proxy.ru  # Мониторинг вашего фронтенда
+        - https://ya.ru             # Тестовый внешний сайт
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

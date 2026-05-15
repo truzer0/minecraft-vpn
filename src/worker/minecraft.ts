@@ -18,7 +18,7 @@ minecraft.get("/profile", async (c) => {
   if (!profile) {
     const result = await c.env.DB.prepare(
       "INSERT INTO minecraft_profiles (user_id, server_ip) VALUES (?, ?)"
-    ).bind(userId, c.env.MINECRAFT_SERVER_IP || "85.215.132.23").run();
+    ).bind(userId, c.env.MINECRAFT_SERVER_IP || "153.80.251.181").run();
     
     profile = await c.env.DB.prepare(
       "SELECT * FROM minecraft_profiles WHERE user_id = ?"

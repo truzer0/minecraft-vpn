@@ -153,7 +153,7 @@ export class VpnService {
     // Генерируем конфиг
     const config: VpnConfig = {
       protocol: 'vless',
-      address: process.env.APP_URL || '85.215.132.23',
+      address: process.env.APP_URL || '153.80.251.181',
       port: 8443,
       uuid: client!.id,
       type: 'tcp',

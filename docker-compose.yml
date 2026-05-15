@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: mcvpn-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-minecraft_vpn}
@@ -10,44 +8,25 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - mcvpn-network
+    restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minecraft_vpn_user} -d ${POSTGRES_DB:-minecraft_vpn}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 1.5G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
 
   redis:
     image: redis:7-alpine
     container_name: mcvpn-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --save 60 1 --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
       - mcvpn-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 384M
 
   app:
     build:
@@ -56,35 +35,14 @@ services:
     container_name: mcvpn-app
     environment:
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=1024
-      - APP_URL=${APP_URL:-https://minecraft-vpn.com}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-minecraft_vpn_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-minecraft_vpn}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
-      - MC_RCON_HOST=minecraft
-      - MC_RCON_PORT=25575
-      - MC_RCON_PASSWORD=${RCON_PASSWORD}
-      - MC_API_KEY=${MC_API_KEY}
-      - XUI_PORT=${XUI_PORT:-2053}
-      - XUI_USERNAME=${XUI_USERNAME:-admin}
-      - XUI_PASSWORD=${XUI_PASSWORD}
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     networks:
       - mcvpn-network
     restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1.2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
 
   frontend:
     build:
@@ -94,102 +52,200 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    networks:
+      - mcvpn-network
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
     depends_on:
       - app
+      - grafana
     volumes:
-      - ./ssl:/etc/nginx/ssl:ro
-    networks:
-      - mcvpn-network
+      - ./nginx-logs:/var/log/nginx
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 128M
 
-  minecraft:
-    image: itzg/minecraft-server:java17-alpine
-    container_name: mcvpn-minecraft
+  minecraft2:
+    image: my-youer-server:latest
+    container_name: mcvpn-minecraft2
     ports:
-      - "25565:25565/tcp"
-      - "25575:25575/tcp"
+      - "25565:25565/tcp"  # Оставляем — игровой порт
+      - "8081:8081"         # Что это? Если не нужно наружу — уберите
+      - "24454:24454/udp"       # Что это? Если не нужно наружу — уберите
     environment:
-      EULA: "TRUE"
-      VERSION: "1.20.4"
-      TYPE: "FORGE"
-      FORGE_VERSION: "49.1.0"
-      MEMORY: "3G"
-      JVM_XX_OPTS: "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200"
-      ONLINE_MODE: "true"
-      SERVER_PORT: 25565
-      ENABLE_RCON: "true"
-      RCON_PASSWORD: ${RCON_PASSWORD}
-      RCON_PORT: 25575
-      MAX_PLAYERS: 30
-      VIEW_DISTANCE: 8
-      SIMULATION_DISTANCE: 6
-      ENABLE_WHITELIST: "true"
-      ENFORCE_WHITELIST: "true"
-      USE_AIKAR_FLAGS: "true"
+      - EULA=TRUE
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-minecraft_vpn_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-minecraft_vpn}
+      - RESOURCE_PACK=http://153.80.251.181/mods/minecraft-mods.zip
+      - RESOURCE_PACK_SHA1=88f06b8d61dce1c8083088d3c2e11302f3edc77d
+      - RESOURCE_PACK_ENFORCE=false
+      - JAVA_TOOL_OPTIONS=-DsocksProxyHost=172.18.0.1 -DsocksProxyPort=10888
+    command:
+      - java
+      - -Dhttp.nonProxyHosts=localhost|127.0.0.1|postgres|redis|*.local
+      - -DsocksNonProxyHosts=localhost|127.0.0.1|postgres|redis|*.local
+      - -Xmx6G
+      - -Xms4G
+      - -jar
+      - /data/youer.jar
+      - nogui
     volumes:
-      - ./minecraft_data:/data
-      - ./minecraft/mods:/data/mods:ro
-      - ./minecraft/config:/data/config:ro
-      - ./minecraft/plugins/EasyAuth:/data/plugins/EasyAuth
+      - ./minecraft2_data:/data
+      - ./minecraft2_data/plugins/AuthMe/config.yml:/data/plugins/AuthMe/config.yml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - mcvpn-network
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 4G
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - mcvpn-network
+    restart: unless-stopped
+    ports: 
+      - "127.0.0.1:9090:9090"
+ 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+   # ports: 
+   #  - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}  # Смените пароль!
+      - GF_SERVER_ROOT_URL=https://grafana.minecraft-proxy.ru
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    networks:
+      - mcvpn-network
+    restart: unless-stopped
+  
+  loki:
+    image: grafana/loki:latest
+    container_name: mcvpn-loki
+    ports: 
+      - "127.0.0.1:3100:3100"
+    networks:
+      - mcvpn-network
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: mcvpn-promtail
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    volumes:
+      - ./promtail:/etc/promtail:ro
+      - /var/log:/var/log:ro
+      - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      - ./promtail/GeoLite2-City.mmdb:/etc/promtail/GeoLite2-City.mmdb:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+  
+  fail2ban-exporter:
+    image: ghcr.io/mivek/fail2ban_exporter
+    container_name: mcvpn-fail2ban-exporter
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    ports: 
+      - "127.0.0.1:9191:9191"
+    volumes:
+      - /var/run/fail2ban/fail2ban.sock:/var/run/fail2ban/fail2ban.sock:ro
+    environment:
+      - FAIL2BAN_SOCKET=/var/run/fail2ban/fail2ban.sock
+      - FAIL2BAN_EXPORTER_PORT=9191
+ 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    ports: 
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
 
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
     container_name: mcvpn-3x-ui
-    network_mode: host
+    network_mode: host  # Уже слушает на хосте, порты не нужно пробрасывать
     environment:
-      XUI_PORT: ${XUI_PORT:-2053}
-      XUI_USERNAME: ${XUI_USERNAME:-admin}
-      XUI_PASSWORD: ${XUI_PASSWORD}
-      TZ: "Europe/Moscow"
+       XUI_PORT: 45821
     volumes:
       - ./3x-ui/db/:/etc/x-ui/
-      - ./3x-ui/cert/:/root/cert/
-      - ./3x-ui/config/config.json:/usr/local/x-ui/bin/config.json:ro
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    sysctls:
-      - net.core.somaxconn=65535
-      - net.ipv4.tcp_congestion_control=bbr
+      - ./3x-ui/panel.crt:/etc/ssl/panel.crt:ro
+      - ./3x-ui/panel.key:/etc/ssl/panel.key:ro
     restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.8'
-          memory: 512M
-
-  zapret:
-    build:
-      context: ./zapret
-      dockerfile: Dockerfile
-    container_name: mcvpn-zapret
-    network_mode: "host"
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+  
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-minecraft_vpn_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-minecraft_vpn}?sslmode=disable
+    ports: 
+      - "127.0.0.1:9187:9187"
     volumes:
-      - ./zapret/config:/opt/zapret/config:ro
-      - ./zapret/logs:/opt/zapret/logs
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 128M
+      - ./postgres_exporter.yml:/postgres_exporter.yml:ro
+    command:
+      - --config.file=/postgres_exporter.yml
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    ports: 
+      - "127.0.0.1:9115:9115"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+
+  x-ui-exporter:
+    image: hteppl/x-ui-exporter:latest
+    container_name: x-ui-exporter
+    restart: unless-stopped
+    networks:
+      - mcvpn-network
+    environment:
+      - PANEL_BASE_URL=http://172.17.0.1:45821
+      - PANEL_USERNAME=truzer0 
+      - PANEL_PASSWORD=Truzer03212
+      - INSECURE_SKIP_VERIFY=true 
+      - METRICS_PORT=9090
+    ports: 
+      - "127.0.0.1:9091:9090"
 
 networks:
   mcvpn-network:
@@ -198,3 +254,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
